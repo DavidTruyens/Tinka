@@ -5,11 +5,9 @@
 */
 
 // the setup function runs once when you press reset or power the board
-#include <Servo.h>
 #include <Wire.h>
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_HMC5883_U.h>
 #include <Adafruit_NeoPixel.h>
 
 //accelero
@@ -21,9 +19,6 @@ Adafruit_MMA8451 mma = Adafruit_MMA8451();
 #define BRIGHTNESS 50
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, PIN, NEO_GRBW + NEO_KHZ800);
-
-//settings
-int timeout = 5000;
 
 byte neopix_gamma[] = {
 	0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -47,7 +42,7 @@ byte neopix_gamma[] = {
 void setup() {
 	//initiate serial
 	Serial.begin(9600);
-	while (!Serial);
+	//while (!Serial);
 	//initiate accelero
 	if (!mma.begin()) {
 		Serial.println("Couldnt start accelero");
@@ -69,65 +64,124 @@ void setup() {
 
 }
 
+//settings
+bool LedOn = false;
+uint32_t timeout = 1000;
+uint32_t timer = 0;
+uint8_t previousState = MMA8451_PL_LRB;
+uint32_t debugger = 0;
+uint32_t debuggertimeout = 100;
+
+//turn on
+uint32_t timer1 = 0;
+uint8_t State1 = MMA8451_PL_LRB;
+uint32_t onTimeout = 2000;
+
+/*
+Upright = MMA8451_PL_LRB
+Upsidedown = MMA8451_PL_LRF
+*/
+
+
 // the loop function runs over and over again until power down or reset
 void loop() {
-	//if led off, check accelero
 
-	//if led on, check mageneto and accelero
+	//if led off, check accelero
 	mma.read();
 
 	/* Get a new sensor event */
 	sensors_event_t event;
 	mma.getEvent(&event);
 
-	/* Display the results (acceleration is measured in m/s^2) */
-	Serial.print("X: \t"); Serial.print(event.acceleration.x); Serial.print("\t");
-	Serial.print("Y: \t"); Serial.print(event.acceleration.y); Serial.print("\t");
-	Serial.print("Z: \t"); Serial.print(event.acceleration.z); Serial.print("\t");
-	Serial.println("m/s^2 ");
-
 	/* Get the orientation of the sensor */
 	uint8_t o = mma.getOrientation();
 
-	switch (o) {
-	case MMA8451_PL_PUF:
-		Serial.println("Portrait Up Front");
-		colorWipe(strip.Color(255, 0, 0), 50); // Red
-		colorWipe(strip.Color(0, 255, 0), 50); // Green
-		break;
-	case MMA8451_PL_PUB:
-		Serial.println("Portrait Up Back");
-		colorWipe(strip.Color(0, 0, 255), 50); // Blue
-		colorWipe(strip.Color(0, 0, 0, 255), 50); // White
-		break;
-	case MMA8451_PL_PDF:
-		Serial.println("Portrait Down Front");
-		whiteOverRainbow(20, 75, 5);
-		break;
-	case MMA8451_PL_PDB:
-		Serial.println("Portrait Down Back");
-		pulseWhite(5);
-		break;
-	case MMA8451_PL_LRF:
-		Serial.println("Landscape Right Front");
-		rainbowFade2White(3, 3, 1);
-		break;
-	case MMA8451_PL_LRB:
-		Serial.println("Landscape Right Back");
-		fullWhite();
-		delay(2000);
-		break;
-	case MMA8451_PL_LLF:
-		Serial.println("Landscape Left Front");
-		fullWhite();
-		delay(2000);
-		break;
-	case MMA8451_PL_LLB:
-		Serial.println("Landscape Left Back");
-		fullWhite();
-		delay(2000);
-		break;
+	if (LedOn) {
+		switch (o) {
+		case MMA8451_PL_PUF:
+			Serial.println("Portrait Up Front");
+			colorWipe(strip.Color(255, 0, 0), 50); // Red
+			colorWipe(strip.Color(0, 255, 0), 50); // Green
+			break;
+		case MMA8451_PL_PUB:
+			Serial.println("Portrait Up Back");
+			colorWipe(strip.Color(0, 0, 255), 50); // Blue
+			colorWipe(strip.Color(0, 0, 0, 255), 50); // White
+			break;
+		case MMA8451_PL_PDF:
+			Serial.println("Portrait Down Front");
+			whiteOverRainbow(20, 75, 5);
+			break;
+		case MMA8451_PL_PDB:
+			Serial.println("Portrait Down Back");
+			pulseWhite(5);
+			break;
+		case MMA8451_PL_LRF:
+			Serial.println("Landscape Right Front");
+			fullWhite();
+			break;
+		case MMA8451_PL_LRB:
+			Serial.println("Landscape Right Back");
+			rainbowCycle(5);
+			delay(2000);
+			break;
+		case MMA8451_PL_LLF:
+			Serial.println("Landscape Left Front");
+			fullWhite();
+			delay(2000);
+			break;
+		case MMA8451_PL_LLB:
+			Serial.println("Landscape Left Back");
+			fullWhite();
+			delay(2000);
+			break;
+		}
 	}
+	
+	else {
+		if (State1 != o) {
+			Serial.println("status change");
+			State1=o;
+			timer1 = millis();
+			if ((millis() - timer1) <= onTimeout) {
+				Serial.println("leds on");
+				LedOn = true;
+			}
+		}
+	}
+
+	if (o != previousState) {
+		previousState = o;
+		timer = millis();
+	}
+
+	if ((millis()-timer) > timeout) {
+		//Serial.println("Black out");
+		blackout();
+		LedOn = false;
+	}
+
+
+
+	//if ((millis() - debugger) >= debuggertimeout) {
+	//	Serial.print("timer: ");
+	//	Serial.println(millis() - timer);
+	//}
+
+
+
+
+	//
+	
+}
+
+
+// Turn off
+void blackout() {
+	for (uint16_t i = 0; i < strip.numPixels(); i++) {
+		strip.setPixelColor(i, 0, 0, 0, 0);
+	}
+	strip.show();
 }
 
 // Fill the dots one after the other with a color
